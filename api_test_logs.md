@@ -90,7 +90,7 @@ curl -X POST http://localhost:3000/api/sync/push \
 **Conclusion Générale** : Le backend est prêt pour une synchronisation multi-services parfaite. 🚀
 
 ---
-
+//ok
 ## 🛠 Guide de Dépannage Vercel (Erreur 500)
 
 Si vous continuez à voir une erreur 500 sur Vercel :
