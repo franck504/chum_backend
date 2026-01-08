@@ -65,4 +65,12 @@ app.get('/api/sync/pull/:matricule', async (req, res) => {
 });
 
 // Exporter pour Vercel
+// Démarrage local (si pas sur Vercel)
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+    });
+}
+
 module.exports = app;
