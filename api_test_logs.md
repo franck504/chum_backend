@@ -6,13 +6,28 @@ Base URL: https://chum-backend.vercel.app/api
 **Objectif** : Vérifier que le backend est opérationnel et connecté à MongoDB Atlas.
 **Commande** : `curl -X GET https://chum-backend.vercel.app/api/status -i`
 
-**Résultat** : 🛑 **ÉCHEC (Erreur 500)**
+**Résultat** : ✅ **SUCCÈS (Production)**
+```json
+{"status":"CHUM Backend Operational","time":"2026-01-08T08:01:48.751Z"}
 ```
-HTTP/2 500 
-content-type: text/plain; charset=utf-8
-x-vercel-error: FUNCTION_INVOCATION_FAILED
+**Analyse** : Le backend est parfaitement connecté à MongoDB Atlas sur Vercel.
+
+---
+
+## 1c. Test Production : PUSH et PULL
+**Objectif** : Valider le cycle complet en production.
+**Commandes** :
+```bash
+# PUSH
+curl -X POST https://chum-backend.vercel.app/api/sync/push -H "Content-Type: application/json" -d '{"matricule":"87654321","type":"patient","data":{"uuid":"prod-uuid-001","nom":"PROD","serviceTag":"patients_pediatrie","lastModified":"2026-01-08T11:00:00Z"}}'
+
+# PULL
+curl -X GET https://chum-backend.vercel.app/api/sync/pull/87654321
 ```
-**Analyse** : Le backend crash au démarrage sur Vercel. Causes possibles : variable `MONGODB_URI` manquante sur Vercel, ou erreur dans `utils/db.js`.
+
+**Résultat** : ✅ **SUCCÈS**
+- Envoi : `{"success":true}`
+- Récupération : Le `serviceTag` est bien présent dans les données récupérées en production.
 
 ---
 

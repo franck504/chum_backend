@@ -17,6 +17,38 @@ app.get('/api/status', (req, res) => {
     res.json({ status: 'CHUM Backend Operational', time: new Date() });
 });
 
+// Route pour obtenir un résumé rapide (Smart Sync)
+app.get('/api/sync/summary/:matricule', async (req, res) => {
+    try {
+        const { matricule } = req.params;
+
+        // Récupérer le dernier timestamp du profil
+        const profile = await Profile.findOne({ rpps: matricule }, { lastModified: 1 });
+
+        // Récupérer le dernier timestamp des patients
+        const latestPatient = await Patient.findOne(
+            { practitionerMatricule: matricule },
+            { lastModified: 1 }
+        ).sort({ lastModified: -1 });
+
+        const patientCount = await Patient.countDocuments({ practitionerMatricule: matricule });
+
+        let lastModified = profile?.lastModified || new Date(0);
+        if (latestPatient && latestPatient.lastModified > lastModified) {
+            lastModified = latestPatient.lastModified;
+        }
+
+        res.json({
+            lastModified,
+            patientCount,
+            hasProfile: !!profile
+        });
+    } catch (error) {
+        console.error('Summary Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Route de synchronisation : PUSH
 app.post('/api/sync/push', async (req, res) => {
     try {
