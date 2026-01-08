@@ -4,6 +4,7 @@ const cors = require('cors');
 const connectDB = require('../utils/db');
 const Patient = require('../models/Patient');
 const Profile = require('../models/Profile');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 
@@ -12,6 +13,18 @@ app.use(express.json());
 
 // Connexion à la DB (Vercel réutilise les instances, connectDB gère ça via Mongoose)
 connectDB();
+
+// Configuration Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const model = genAI.getGenerativeModel({
+    model: 'gemini-flash-latest',
+    systemInstruction: `Tu es un assistant IA médical intégré à l'application CHUM. 
+Ton rôle est d'aider les médecins et étudiants en médecine. 
+1. Réponds de manière concise et professionnelle.
+2. Si on te donne des données de patient, analyse-les pour identifier des signes d'alerte ou proposer un plan de diagnostic.
+3. Rappelle toujours que tes réponses sont à titre indicatif et que le médecin reste le seul décisionnaire.
+4. Utilise un ton bienveillant et structuré (point par point si possible).`,
+});
 
 app.get('/api/status', (req, res) => {
     res.json({ status: 'CHUM Backend Operational', time: new Date() });
@@ -93,6 +106,37 @@ app.get('/api/sync/pull/:matricule', async (req, res) => {
     } catch (error) {
         console.error('Pull Error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Route AI Proxy
+app.post('/api/ai/chat', async (req, res) => {
+    try {
+        const { message, history, patientContext } = req.body;
+
+        if (!process.env.GEMINI_API_KEY) {
+            return res.status(500).json({
+                error: 'AI Configuration error: GEMINI_API_KEY is missing on server.'
+            });
+        }
+
+        const chat = model.startChat({
+            history: history || [],
+        });
+
+        let fullMessage = message;
+        if (patientContext) {
+            fullMessage = `CONTEXTE PATIENT : \n${JSON.stringify(patientContext)}\n\nQUESTION : \n${message}`;
+        }
+
+        const result = await chat.sendMessage(fullMessage);
+        const response = await result.response;
+        const text = response.text();
+
+        res.json({ response: text });
+    } catch (error) {
+        console.error('AI Proxy Error:', error);
+        res.status(500).json({ error: 'Erreur lors de la communication avec l\'IA.' });
     }
 });
 
