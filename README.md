@@ -20,12 +20,10 @@ Dans Vercel ou en local (`.env`), configurez :
 MONGODB_URI=votre_connexion_string_mongodb
 ```
 
-### 3. Déploiement sur Vercel
-1. Installez Vercel CLI : `npm i -g vercel`
-2. Déployez depuis le dossier `chum_backend` :
-   ```bash
-   vercel
-   ```
+### 3. Configuration Vercel & GitHub
+1. Créez un projet sur Vercel lié à ce dépôt GitHub.
+2. Ajoutez la variable d'environnement `MONGODB_URI` dans les paramètres de Vercel.
+3. Vercel déploiera automatiquement à chaque commit sur `main`.
 3. Une fois déployé, récupérez l'URL (ex: `https://chum-backend.vercel.app`) et mettez-la à jour dans `lib/core/services/sync_service.dart` sur Flutter.
 
 ## 📡 API Endpoints
