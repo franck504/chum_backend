@@ -31,7 +31,8 @@ const PatientSchema = new mongoose.Schema({
   tensionArterielle: String,
   practitionerName: String,
   lastModified: { type: Date, required: true },
-  boxName: String, // Pour savoir dans quel dossier Hive restaurer
+  serviceTag: String, // Pour savoir dans quel dossier Hive restaurer (anciennement boxName)
+  boxName: String,
 }, { timestamps: true });
 
 module.exports = mongoose.model('Patient', PatientSchema);
