@@ -1,22 +1,26 @@
-# CHUM API - Test Log (Vercel Production)
-Date: 2026-01-08
-Base URL: https://chum-backend.vercel.app/api
+# CHUM API - Journal de Test (Production Vercel)
 
-## 1. Test Endpoint : Status
-**Objectif** : Vérifier que le backend est opérationnel et connecté à MongoDB Atlas.
-**Commande** : `curl -X GET https://chum-backend.vercel.app/api/status -i`
+Date : 2026-01-08
+URL de base : https://chum-backend.vercel.app/api
 
-**Résultat** : ✅ **SUCCÈS (Production)**
+## 1. Test du point d'entrée : Status
+
+Objectif : Vérifier que le backend est opérationnel et correctement connecté à MongoDB Atlas.
+Commande : curl -X GET https://chum-backend.vercel.app/api/status -i
+
+Résultat : SUCCÈS
 ```json
 {"status":"CHUM Backend Operational","time":"2026-01-08T08:01:48.751Z"}
 ```
-**Analyse** : Le backend est parfaitement connecté à MongoDB Atlas sur Vercel.
+Analyse : Le backend est opérationnel et la connexion à la base de données est établie.
 
 ---
 
-## 1c. Test Production : PUSH et PULL
-**Objectif** : Valider le cycle complet en production.
-**Commandes** :
+## 2. Test de synchronisation : PUSH et PULL (Production)
+
+Objectif : Valider le cycle complet de sauvegarde et de récupération des données.
+Commandes :
+
 ```bash
 # PUSH
 curl -X POST https://chum-backend.vercel.app/api/sync/push -H "Content-Type: application/json" -d '{"matricule":"87654321","type":"patient","data":{"uuid":"prod-uuid-001","nom":"PROD","serviceTag":"patients_pediatrie","lastModified":"2026-01-08T11:00:00Z"}}'
@@ -25,75 +29,28 @@ curl -X POST https://chum-backend.vercel.app/api/sync/push -H "Content-Type: app
 curl -X GET https://chum-backend.vercel.app/api/sync/pull/87654321
 ```
 
-**Résultat** : ✅ **SUCCÈS**
-- Envoi : `{"success":true}`
-- Récupération : Le `serviceTag` est bien présent dans les données récupérées en production.
+Résultat : SUCCÈS
+- Envoi : {"success":true}
+- Récupération : Les données, incluant le serviceTag, sont correctement récupérées.
 
 ---
 
-## 1b. Test Comparatif : Local
-**Commande** : `curl -X GET http://localhost:3000/api/status -i`
+## 3. Test local comparatif
 
-**Résultat** : ✅ **SUCCÈS**
+Commande : curl -X GET http://localhost:3000/api/status -i
+
+Résultat : SUCCÈS
 ```json
 {"status":"CHUM Backend Operational","time":"2026-01-08T07:51:47.614Z"}
 ```
-**Conclusion** : Le code est fonctionnel. L'erreur 500 sur Vercel est causée par un problème d'infrastructure (IP non autorisée sur MongoDB Atlas ou erreur de saisie de la clé `MONGODB_URI` sur le dashboard Vercel).
+Conclusion : Le code est fonctionnel localement. Les erreurs éventuelles sur Vercel sont généralement dues à des restrictions d'adresses IP ou des configurations de variables d'environnement.
 
 ---
 
-## 2. Test Fonctionnel : PUSH (Envoi)
-**Objectif** : Vérifier la persistance du `serviceTag` sur le backend.
-**Commande** : 
-```bash
-curl -X POST http://localhost:3000/api/sync/push \
--H "Content-Type: application/json" \
--d '{
-  "matricule": "12345678",
-  "type": "patient",
-  "data": {
-    "uuid": "test-uuid-003",
-    "nom": "TEST_TAG_FINAL",
-    "prenom": "SyncTagFinal",
-    "serviceTag": "patients_pediatrie",
-    "lastModified": "2026-01-08T11:00:00Z"
-  }
-}'
-```
+## Guide de dépannage (Erreur 500 sur Vercel)
 
-**Résultat** : ✅ **SUCCÈS**
-```json
-{"success":true}
-```
+Si une erreur 500 survient en production :
 
----
-
-## 3. Test Fonctionnel : PULL (Récupération)
-**Objectif** : Vérifier que le `serviceTag` est correctement renvoyé par l'API.
-**Commande** : `curl -X GET http://localhost:3000/api/sync/pull/12345678 -i`
-
-**Résultat** : ✅ **SUCCÈS**
-```json
-{
-  "profile": null,
-  "patients": [
-    {
-      "uuid": "test-uuid-003",
-      "nom": "TEST_TAG_FINAL",
-      "prenom": "SyncTagFinal",
-      "serviceTag": "patients_pediatrie",
-      "practitionerMatricule": "12345678"
-    }
-  ]
-}
-```
-**Conclusion Générale** : Le backend est prêt pour une synchronisation multi-services parfaite. 🚀
-
----
-//ok
-## 🛠 Guide de Dépannage Vercel (Erreur 500)
-
-Si vous continuez à voir une erreur 500 sur Vercel :
-1. **IP Whitelisting** : Allez sur MongoDB Atlas > Network Access. Vérifiez que `0.0.0.0/0` est ajouté. Vercel utilise des IPs dynamiques qui changent tout le temps.
-2. **Variable MONGODB_URI** : Dans le dashboard Vercel (Project > Settings > Environment Variables), vérifiez qu'il n'y a pas d'espace caché au début ou à la fin de la valeur de la clé `MONGODB_URI`.
-3. **Redéploiement** : Poussez les dernières corrections que j'ai faites dans `utils/db.js` et `models/Patient.js` sur GitHub. Vercel reconstruira automatiquement le backend.
+1. Accès réseau (IP Whitelisting) : Dans MongoDB Atlas > Network Access, vérifiez que l'accès est autorisé depuis n'importe quelle adresse (0.0.0.0/0). Vercel utilise des adresses IP dynamiques.
+2. Variables d'environnement : Vérifiez qu'il n'y a pas d'espaces ou de caractères invisibles dans la valeur de MONGODB_URI dans le tableau de bord Vercel.
+3. Déploiement : Assurez-vous que les dernières modifications du code ont bien été poussées sur la branche principale pour déclencher un redéploiement.

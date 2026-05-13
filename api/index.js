@@ -8,13 +8,15 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 
+// Configuration des middlewares de base
 app.use(cors());
 app.use(express.json());
 
-// Connexion à la DB (Vercel réutilise les instances, connectDB gère ça via Mongoose)
+// On initialise la connexion à la base de données. 
+// Mongoose gère le maintien de la connexion, ce qui est idéal pour l'environnement Vercel.
 connectDB();
 
-// Configuration Gemini
+// Initialisation de Gemini avec les directives spécifiques au CHUM
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({
     model: 'gemini-flash-latest',
@@ -31,19 +33,27 @@ DIRECTIVES DE RÉPONSE :
 INTERDICTION : Ne sors jamais de ton rôle de conseiller médical pour CHUM.`,
 });
 
+// Endpoint simple pour vérifier que tout tourne correctement
 app.get('/api/status', (req, res) => {
-    res.json({ status: 'CHUM Backend Operational', time: new Date() });
+    res.json({ 
+        status: 'CHUM Backend Operational', 
+        time: new Date(),
+        environment: process.env.NODE_ENV || 'development'
+    });
 });
 
-// Route pour obtenir un résumé rapide (Smart Sync)
+/**
+ * Récupère un résumé rapide pour la synchronisation (Smart Sync).
+ * On vérifie la date de dernière modification pour savoir si une mise à jour est nécessaire.
+ */
 app.get('/api/sync/summary/:matricule', async (req, res) => {
     try {
         const { matricule } = req.params;
 
-        // Récupérer le dernier timestamp du profil
+        // On récupère juste le timestamp pour gagner en performance
         const profile = await Profile.findOne({ rpps: matricule }, { lastModified: 1 });
 
-        // Récupérer le dernier timestamp des patients
+        // Idem pour le dernier patient modifié par ce praticien
         const latestPatient = await Patient.findOne(
             { practitionerMatricule: matricule },
             { lastModified: 1 }
@@ -62,66 +72,79 @@ app.get('/api/sync/summary/:matricule', async (req, res) => {
             hasProfile: !!profile
         });
     } catch (error) {
-        console.error('Summary Error:', error);
-        res.status(500).json({ error: error.message });
+        console.error('Erreur lors de la récupération du résumé :', error);
+        res.status(500).json({ error: 'Une erreur est survenue lors de la génération du résumé.' });
     }
 });
 
-// Route de synchronisation : PUSH
+/**
+ * Route pour envoyer des données (PUSH).
+ * Gère à la fois les profils et les dossiers patients via un "upsert".
+ */
 app.post('/api/sync/push', async (req, res) => {
     try {
         const { matricule, type, data } = req.body;
 
         if (!matricule || !type || !data) {
-            return res.status(400).json({ error: 'Missing required fields' });
+            return res.status(400).json({ error: 'Champs obligatoires manquants (matricule, type ou data).' });
         }
 
         if (type === 'patient') {
-            // Upsert basé sur l'UUID pour les patients
+            // On utilise l'UUID comme clé unique pour éviter les doublons
             await Patient.findOneAndUpdate(
                 { uuid: data.uuid },
                 { ...data, practitionerMatricule: matricule },
                 { upsert: true, new: true }
             );
         } else if (type === 'profile') {
-            // Upsert basé sur le matricule (rpps) pour le profil
+            // Le matricule (RPPS) sert d'identifiant unique pour le profil
             await Profile.findOneAndUpdate(
                 { rpps: matricule },
                 { ...data },
                 { upsert: true, new: true }
             );
+        } else {
+            return res.status(400).json({ error: 'Type de synchronisation inconnu.' });
         }
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Push Error:', error);
-        res.status(500).json({ error: error.message });
+        console.error('Erreur lors du push de données :', error);
+        res.status(500).json({ error: 'Impossible de synchroniser les données.' });
     }
 });
 
-// Route de synchronisation : PULL/RESTORE
+/**
+ * Récupère l'intégralité des données pour un praticien (PULL).
+ */
 app.get('/api/sync/pull/:matricule', async (req, res) => {
     try {
         const { matricule } = req.params;
 
-        const profile = await Profile.findOne({ rpps: matricule });
-        const patients = await Patient.find({ practitionerMatricule: matricule });
+        // On récupère tout d'un coup : profil et liste des patients
+        const [profile, patients] = await Promise.all([
+            Profile.findOne({ rpps: matricule }),
+            Patient.find({ practitionerMatricule: matricule })
+        ]);
 
         res.json({ profile, patients });
     } catch (error) {
-        console.error('Pull Error:', error);
-        res.status(500).json({ error: error.message });
+        console.error('Erreur lors du pull de données :', error);
+        res.status(500).json({ error: 'Erreur lors de la récupération des données de sauvegarde.' });
     }
 });
 
-// Route AI Proxy
+/**
+ * Proxy pour l'IA Gemini. 
+ * Permet de discuter avec l'assistant en lui passant le contexte du patient si besoin.
+ */
 app.post('/api/ai/chat', async (req, res) => {
     try {
         const { message, history, patientContext } = req.body;
 
         if (!process.env.GEMINI_API_KEY) {
             return res.status(500).json({
-                error: 'AI Configuration error: GEMINI_API_KEY is missing on server.'
+                error: 'Configuration IA manquante sur le serveur (clé API absente).'
             });
         }
 
@@ -129,6 +152,7 @@ app.post('/api/ai/chat', async (req, res) => {
             history: history || [],
         });
 
+        // Si on a un contexte patient, on le préfixe à la question pour que l'IA en tienne compte
         let fullMessage = message;
         if (patientContext) {
             fullMessage = `CONTEXTE PATIENT : \n${JSON.stringify(patientContext)}\n\nQUESTION : \n${message}`;
@@ -140,21 +164,18 @@ app.post('/api/ai/chat', async (req, res) => {
 
         res.json({ response: text });
     } catch (error) {
-        console.error('AI Proxy Error:', error);
-        res.status(500).json({ error: 'Erreur lors de la communication avec l\'IA.' });
+        console.error('Erreur AI Proxy :', error);
+        res.status(500).json({ error: 'Désolé, une erreur est survenue lors de la communication avec l\'assistant médical.' });
     }
 });
 
-// Exporter pour Vercel
-// Démarrage local (si pas sur Vercel)
+// Démarrage du serveur pour le développement local
 if (process.env.NODE_ENV !== 'production') {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
-        console.log(`Server is running on http://localhost:${PORT}`);
+        console.log(`Le serveur est lancé sur http://localhost:${PORT}`);
     });
 }
 
+// Export pour Vercel
 module.exports = app;
-
-
-//trigger build and redeploy
