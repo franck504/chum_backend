@@ -1,52 +1,119 @@
 # CHUM Backend
 
-Ce dépôt contient le code source du backend pour l'écosystème CHUM (Centre Hospitalier Universitaire de Madagascar). Il assure la synchronisation cloud des dossiers patients et l'intégration de l'assistant médical basé sur l'IA.
+Ce projet est le service backend de l'écosystème CHUM (Centre Hospitalier Universitaire de Madagascar). Il permet la synchronisation cloud des dossiers patients et fournit une interface avec l'assistant médical CHUM AI basé sur Google Gemini.
 
-## Technologies utilisées
+## Table des matières
 
-- Runtime : Node.js (ExpressJS)
-- Hébergement : Vercel (Fonctions Serverless)
-- Base de données : MongoDB Atlas
-- IA : Google Generative AI (Gemini Flash)
+- [Technologies](#technologies)
+- [Structure du Projet](#structure-du-projet)
+- [Installation et Configuration](#installation-et-configuration)
+- [Utilisation en Développement](#utilisation-en-développement)
+- [Documentation de l'API](#documentation-de-lapi)
+- [Déploiement](#déploiement)
 
-## Configuration et Déploiement
+## Technologies
 
-### 1. Base de données (MongoDB Atlas)
+- **Runtime** : Node.js
+- **Framework** : Express.js
+- **Base de données** : MongoDB (via Mongoose)
+- **Validation** : Joi
+- **IA** : Google Generative AI (Gemini 1.5 Flash)
+- **Hébergement** : Vercel
 
-1. Créez un cluster sur MongoDB Atlas.
-2. Configurez un utilisateur et autorisez l'accès réseau (IP Whitelisting) pour toutes les adresses (0.0.0.0/0) afin de permettre les connexions depuis Vercel.
-3. Récupérez votre chaîne de connexion (Connection String).
+## Structure du Projet
 
-### 2. Variables d'Environnement
+```text
+api/             # Point d'entrée principal pour Vercel
+controllers/     # Logique métier (Synchronisation, IA)
+models/          # Modèles de données Mongoose (Patient, Profile)
+routes/          # Définition des points d'accès API
+utils/           # Utilitaires (Connexion DB, formatage IA)
+```
 
-Le projet nécessite les variables suivantes pour fonctionner, que ce soit en local (via un fichier .env) ou sur Vercel :
+## Installation et Configuration
 
-- MONGODB_URI : L'URL de connexion à votre base de données MongoDB.
-- GEMINI_API_KEY : Votre clé API pour l'accès aux modèles Google Gemini.
+### Prérequis
 
-### 3. Déploiement sur Vercel
+- Node.js (v18 ou supérieur recommandé)
+- Un compte MongoDB Atlas
+- Une clé API Google AI Studio (pour Gemini)
 
-1. Liez ce dépôt à un nouveau projet sur Vercel.
-2. Ajoutez les variables d'environnement mentionnées ci-dessus dans les paramètres du projet.
-3. Le déploiement s'effectue automatiquement à chaque mise à jour de la branche principale.
-4. Une fois déployé, mettez à jour l'URL du point d'entrée dans les services de synchronisation de l'application cliente (Flutter).
+### Étapes d'installation
 
-## Points d'entrée de l'API (Endpoints)
+1. **Cloner le dépôt** :
+   ```bash
+   git clone https://github.com/votre-repo/chum_backend.git
+   cd chum_backend
+   ```
 
-### État du service
-- GET /api/status : Vérifie la disponibilité du backend.
+2. **Installer les dépendances** :
+   ```bash
+   npm install
+   ```
 
-### Synchronisation
-- GET /api/sync/summary/:matricule : Récupère un état rapide de la synchronisation pour un utilisateur donné.
-- POST /api/sync/push : Envoie ou met à jour un patient ou un profil dans le cloud.
-- GET /api/sync/pull/:matricule : Récupère l'intégralité des données associées à un matricule.
+3. **Configurer les variables d'environnement** :
+   Copiez le fichier d'exemple et remplissez-le avec vos accès :
+   ```bash
+   cp .env.example .env
+   ```
+   Variables requises :
+   - `MONGODB_URI` : URL de connexion MongoDB Atlas.
+   - `GEMINI_API_KEY` : Clé API pour l'IA.
 
-### Intelligence Artificielle
-- POST /api/ai/chat : Point d'entrée pour interagir avec l'assistant CHUM AI.
+## Utilisation en Développement
 
-## Maintenance et Tests
-
-Pour tester en local, utilisez la commande suivante après avoir configuré votre fichier .env :
+Pour lancer le serveur localement avec rechargement automatique :
+```bash
 npm run dev
+```
+Le serveur sera disponible sur `http://localhost:3000`.
 
-Les journaux de test et les exemples d'appels API sont documentés dans le fichier api_test_logs.md.
+## Documentation de l'API
+
+### Synchronisation (`/api/sync`)
+
+#### GET `/summary/:matricule`
+Récupère un résumé de l'état de synchronisation pour un praticien.
+- **Paramètre** : `matricule` (RPPS du médecin)
+- **Réponse** : Date de dernière modification et nombre de patients.
+
+#### POST `/push`
+Envoie des données pour sauvegarde ou mise à jour.
+- **Corps (JSON)** :
+  ```json
+  {
+    "matricule": "12345678",
+    "type": "patient" | "profile",
+    "data": { ... }
+  }
+  ```
+- **Validation** : Les données sont validées via Joi avant d'être persistées.
+
+#### GET `/pull/:matricule`
+Récupère l'intégralité des données sauvegardées.
+
+### Assistant Médical (`/api/ai`)
+
+#### POST `/chat`
+Communique avec l'assistant CHUM AI.
+- **Corps (JSON)** :
+  ```json
+  {
+    "message": "Ma question...",
+    "history": [],
+    "patientContext": { ... }
+  }
+  ```
+- **Note** : Le `patientContext` est automatiquement formaté pour optimiser la réponse de l'IA.
+
+## Déploiement
+
+Le projet est configuré pour être déployé sur **Vercel**. 
+
+1. Connectez votre compte Vercel à votre dépôt GitHub.
+2. Ajoutez les variables d'environnement (`MONGODB_URI`, `GEMINI_API_KEY`) dans les paramètres Vercel.
+3. Le déploiement s'effectue automatiquement sur la branche `main`.
+
+---
+
+Pour toute question technique, veuillez vous référer aux commentaires dans le code source qui expliquent les choix d'implémentation.
